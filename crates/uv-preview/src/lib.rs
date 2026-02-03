@@ -194,6 +194,7 @@ pub enum PreviewFeature {
     PublishRequireNormalized = 1 << 25,
     Audit = 1 << 26,
     ProjectDirectoryMustExist = 1 << 27,
+    PackagedInit = 1 << 28,
 }
 
 impl PreviewFeature {
@@ -228,6 +229,7 @@ impl PreviewFeature {
             Self::PublishRequireNormalized => "publish-require-normalized",
             Self::Audit => "audit",
             Self::ProjectDirectoryMustExist => "project-directory-must-exist",
+            Self::PackagedInit => "packaged-init",
         }
     }
 }
@@ -275,6 +277,7 @@ impl FromStr for PreviewFeature {
             "publish-require-normalized" => Self::PublishRequireNormalized,
             "audit" => Self::Audit,
             "project-directory-must-exist" => Self::ProjectDirectoryMustExist,
+            "packaged-init" => Self::PackagedInit,
             _ => return Err(PreviewFeatureParseError),
         })
     }

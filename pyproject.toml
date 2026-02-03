@@ -113,3 +113,8 @@ docker = [
 [tool.uv.dependency-groups]
 docs = { requires-python = ">=3.12" }
 docker = { requires-python = ">=3.12" }
+
+[tool.uv.workspace]
+members = [
+    "example-app",
+]

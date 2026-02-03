@@ -4,9 +4,9 @@ use anyhow::Result;
 use assert_cmd::prelude::OutputAssertExt;
 use assert_fs::prelude::*;
 use indoc::indoc;
-use insta::assert_snapshot;
+use insta::{allow_duplicates, assert_snapshot};
 use predicates::prelude::predicate;
-
+use uv_cli::options::FlagSource::Env;
 use uv_static::EnvVars;
 
 use uv_test::{TestContext, uv_snapshot};
@@ -455,7 +455,7 @@ fn init_package_preview() -> Result<()> {
     let child = context.temp_dir.child("foo");
     child.create_dir_all()?;
 
-    uv_snapshot!(context.filters(), context.init().current_dir(&child).arg("--package").arg("--preview"), @"
+    uv_snapshot!(context.filters(), context.init().current_dir(&child).arg("--package"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -4224,4 +4224,156 @@ fn init_working_directory_change() -> Result<()> {
         .assert(predicate::path::is_file());
 
     Ok(())
+}
+
+#[test]
+fn init_preview_layouts() {
+    let context = uv_test::test_context!("3.12");
+
+    // kind, package, entrypoint, main.py, src-package.
+    let layouts = [
+        (None, None, true, false, true),
+        (None, Some("--package"), true, false, true),
+        (None, Some("--no-package"), false, true, false),
+        (Some("--app"), None, false, true, false),
+        (Some("--app"), Some("--package"), true, false, true),
+        (Some("--app"), Some("--no-package"), false, true, false),
+        (Some("--lib"), None, false, false, true),
+        (Some("--lib"), Some("--package"), false, false, true),
+        // (Some("--lib"), Some("--no-package"), ERROR: libraries are always packaged, see init_library_no_package),
+    ];
+
+    allow_duplicates! {
+        for (kind, package, entrypoint, main_py, src_package) in layouts {
+            let child = context.temp_dir.child("foo");
+
+            let mut command = context.init();
+            command.arg(child.as_ref()).arg("--preview");
+            if let Some(kind) = kind {
+                command.arg(kind);
+            }
+            if let Some(package) = package {
+                command.arg(package);
+            }
+
+            uv_snapshot!(context.filters(), command, @"
+                success: true
+                exit_code: 0
+                ----- stdout -----
+
+                ----- stderr -----
+                Initialized project `foo` at `[TEMP_DIR]/foo`
+            ");
+
+            let pyproject_toml = child.join("pyproject.toml");
+            let pyproject = fs_err::read_to_string(&pyproject_toml).unwrap();
+            let main_py_path = child.join("main.py");
+            if main_py {
+                assert!(main_py_path.exists());
+            }
+            let init_py_path = child.join("src").join("foo").join("__init__.py");
+            if src_package {
+                assert!(init_py_path.exists());
+            }
+
+            if entrypoint {
+                insta::with_settings!({
+                    filters => context.filters(),
+                }, {
+                    assert_snapshot!(pyproject, @r#"
+                        [project]
+                        name = "foo"
+                        version = "0.1.0"
+                        description = "Add your description here"
+                        readme = "README.md"
+                        requires-python = ">=3.12"
+                        dependencies = []
+
+                        [project.scripts]
+                        foo = "foo:main"
+
+                        [build-system]
+                        requires = ["uv_build>=[CURRENT_VERSION],<[NEXT_BREAKING]"]
+                        build-backend = "uv_build"
+                        "#
+                    );
+                });
+            } else if main_py {
+                insta::with_settings!({
+                    filters => context.filters(),
+                }, {
+                    assert_snapshot!(pyproject, @r#"
+                        [project]
+                        name = "foo"
+                        version = "0.1.0"
+                        description = "Add your description here"
+                        readme = "README.md"
+                        requires-python = ">=3.12"
+                        dependencies = []
+                        "#
+                    );
+                });
+            } else {
+                insta::with_settings!({
+                    filters => context.filters(),
+                }, {
+                    assert_snapshot!(pyproject, @r#"
+                        [project]
+                        name = "foo"
+                        version = "0.1.0"
+                        description = "Add your description here"
+                        readme = "README.md"
+                        requires-python = ">=3.12"
+                        dependencies = []
+
+                        [build-system]
+                        requires = ["uv_build>=[CURRENT_VERSION],<[NEXT_BREAKING]"]
+                        build-backend = "uv_build"
+                        "#
+                    );
+                });
+            }
+
+            fs_err::remove_dir_all(child.as_ref()).unwrap();
+        }
+    }
+}
+
+/// Test that the basic tutorial works (preview):
+///
+/// ```shell_script
+/// uv init foo
+/// cd foo
+/// uv run foo
+/// ```
+#[test]
+fn init_preview_run() {
+    let context = uv_test::test_context!("3.12");
+
+    let child = context.temp_dir.child("foo");
+
+    uv_snapshot!(context.filters(), context.init().arg(child.as_ref()).arg("--preview"), @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Initialized project `foo` at `[TEMP_DIR]/foo`
+    ");
+
+    // Deactivate the default venv to mute the warning.
+    uv_snapshot!(context.filters(), context.run().env_remove(EnvVars::VIRTUAL_ENV).current_dir(child.as_ref()).arg("foo"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    Using CPython 3.12.[X] interpreter at: [PYTHON-3.12]
+    Creating virtual environment at: .venv
+    Resolved 1 package in [TIME]
+    Prepared 1 package in [TIME]
+    Installed 1 package in [TIME]
+     + foo==0.1.0 (from file://[TEMP_DIR]/foo)
+    Hello from foo!
+    ");
 }
