@@ -349,7 +349,7 @@ impl Lock {
             // Normalize with a simplify/complexify round-trip through `requires-python` to
             // match markers deserialized from the lockfile (which get complexified on read).
             let fork_markers = if duplicates.contains(dist.name()) {
-                resolution
+                let fork_markers = resolution
                     .fork_markers
                     .iter()
                     .filter(|fork_markers| !fork_markers.is_disjoint(dist.marker))
@@ -358,7 +358,8 @@ impl Lock {
                             SimplifiedMarkerTree::new(&requires_python, marker.combined());
                         UniversalMarker::from_combined(simplified.into_marker(&requires_python))
                     })
-                    .collect()
+                    .collect::<Vec<_>>();
+                canonicalize_universal_markers(&fork_markers, &requires_python)
             } else {
                 vec![]
             };
@@ -462,18 +463,12 @@ impl Lock {
             fork_strategy: resolution.options.fork_strategy,
             exclude_newer: resolution.options.exclude_newer.clone().into(),
         };
-        // Normalize fork markers with a simplify/complexify round-trip through
-        // `requires-python`. This ensures markers from the resolver (which don't include
-        // `requires-python` bounds) match markers deserialized from the lockfile (which get
-        // complexified on read).
-        let fork_markers = resolution
-            .fork_markers
-            .iter()
-            .map(|marker| {
-                let simplified = SimplifiedMarkerTree::new(&requires_python, marker.combined());
-                UniversalMarker::from_combined(simplified.into_marker(&requires_python))
-            })
-            .collect();
+        // Canonicalize the top-level fork markers to match what is persisted in
+        // `uv.lock`. In particular, conflict-only fork markers can serialize to
+        // nothing at the top level, and `uv lock --check` should compare against
+        // that canonical form rather than the raw resolver output.
+        let fork_markers =
+            canonicalize_universal_markers(&resolution.fork_markers, &requires_python);
         let lock = Self::new(
             VERSION,
             REVISION,
@@ -6182,6 +6177,36 @@ fn simplified_universal_markers(
     markers: &[UniversalMarker],
     requires_python: &RequiresPython,
 ) -> Vec<String> {
+    canonical_marker_trees(markers, requires_python)
+        .into_iter()
+        .filter_map(MarkerTree::try_to_string)
+        .collect()
+}
+
+/// Canonicalize universal markers to match the form persisted in `uv.lock`.
+///
+/// When the PEP 508 portions of the markers are disjoint, the lockfile stores
+/// only those simplified PEP 508 markers. Otherwise, it stores the simplified
+/// combined markers (including conflict markers). Markers that serialize to
+/// `true` are omitted.
+fn canonicalize_universal_markers(
+    markers: &[UniversalMarker],
+    requires_python: &RequiresPython,
+) -> Vec<UniversalMarker> {
+    canonical_marker_trees(markers, requires_python)
+        .into_iter()
+        .map(|marker| {
+            let simplified = SimplifiedMarkerTree::new(requires_python, marker);
+            UniversalMarker::from_combined(simplified.into_marker(requires_python))
+        })
+        .collect()
+}
+
+/// Return the simplified marker trees that would be persisted in `uv.lock`.
+fn canonical_marker_trees(
+    markers: &[UniversalMarker],
+    requires_python: &RequiresPython,
+) -> Vec<MarkerTree> {
     let mut pep508_only = vec![];
     let mut seen = FxHashSet::default();
     for marker in markers {
@@ -6208,7 +6233,7 @@ fn simplified_universal_markers(
     };
     markers
         .into_iter()
-        .filter_map(MarkerTree::try_to_string)
+        .filter(|marker| !marker.is_true())
         .collect()
 }
 
