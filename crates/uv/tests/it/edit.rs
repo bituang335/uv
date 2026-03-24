@@ -679,16 +679,12 @@ fn add_git_lfs() -> Result<()> {
     // Gather cache locations
     let git_cache = context.cache_dir.child("git-v0");
     let git_checkouts = git_cache.child("checkouts");
-    let git_db = git_cache.child("db");
     let repo_url = RepositoryUrl::parse("https://github.com/astral-sh/test-lfs-repo")?;
-    let lfs_db_bucket_objects = git_db
-        .child(cache_digest(&repo_url))
-        .child(".git")
-        .child("lfs");
-    let ok_checkout_file = git_checkouts
+    let checkout_root = git_checkouts
         .child(cache_digest(&repo_url.with_lfs(Some(true))))
-        .child("261c828")
-        .child(".ok");
+        .child("261c828");
+    let lfs_checkout_objects = checkout_root.child(".git").child("lfs");
+    let ok_checkout_file = checkout_root.child(".ok");
 
     uv_snapshot!(context.filters(), context.add()
         .arg("--no-cache")
@@ -838,11 +834,11 @@ fn add_git_lfs() -> Result<()> {
     ----- stderr -----
     ");
 
-    // Now let's delete some of the LFS entries from our db...
+    // Now let's delete some of the LFS entries from our checkout...
     fs_err::remove_file(&ok_checkout_file)?;
-    fs_err::remove_dir_all(&lfs_db_bucket_objects)?;
+    fs_err::remove_dir_all(&lfs_checkout_objects)?;
 
-    // Test LFS recovery from an incomplete db and non-fresh checkout
+    // Test LFS recovery from an incomplete checkout and non-fresh checkout
     uv_snapshot!(context.filters(), context.add()
         .arg("git+https://github.com/astral-sh/test-lfs-repo")
         .arg("--rev").arg("261c828b8e05251f3a3e4f6b47b149d691c7efbb")
@@ -871,9 +867,9 @@ fn add_git_lfs() -> Result<()> {
     ----- stderr -----
     ");
 
-    // Verify our db and checkout recovered
+    // Verify our checkout recovered
     assert!(ok_checkout_file.exists());
-    assert!(lfs_db_bucket_objects.exists());
+    assert!(lfs_checkout_objects.exists());
 
     // Exercise the sdist cache
     uv_snapshot!(context.filters(), context.add()
