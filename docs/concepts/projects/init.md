@@ -14,31 +14,33 @@ cause the target directory path to be interpreted relative to the specified work
 there's already a project in the target directory, i.e., if there's a `pyproject.toml`, uv will exit
 with an error.
 
-## Applications
+## Default layout
 
-Application projects are suitable for web servers, scripts, and command-line interfaces.
-
-Applications are the default target for `uv init`, but can also be specified with the `--app` flag.
+Many use-cases require a [package](./config.md#project-packaging). For example, if you are creating
+a command-line interface that will be published to PyPI or if you want to define tests in a
+dedicated directory.
 
 ```console
 $ uv init example-app
 ```
 
-The project includes a `pyproject.toml`, a sample file (`main.py`), a readme, and a Python version
-pin file (`.python-version`).
+The project includes a `pyproject.toml`, a sample python file (`__init__.py`), an entrypoint
+(`uv run example-app`), a readme, and a Python version pin file (`.python-version`).
 
 ```console
 $ tree example-app
-example-app
-├── .python-version
+example-app/
+├── pyproject.toml
 ├── README.md
-├── main.py
-└── pyproject.toml
+└── src
+    └── example_app
+        ├── __init__.py
+        └── py.typed
 ```
 
 !!! note
 
-    Prior to v0.6.0, uv created a file named `hello.py` instead of `main.py`.
+    Prior to v0.12.0, uv created a `main.py`. Use `--app` for this layout.
 
 The `pyproject.toml` includes basic metadata. It does not include a build system, it is not a
 [package](./config.md#project-packaging) and will not be installed into the environment:
@@ -49,52 +51,60 @@ name = "example-app"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = []
+
+[project.scripts]
+example-app = "example_app:main"
+
+[build-system]
+requires = ["uv_build>=0.11.1,<0.12.0"]
+build-backend = "uv_build"
 ```
 
 The sample file defines a `main` function with some standard boilerplate:
 
 ```python title="main.py"
 def main():
-    print("Hello from example-app!")
+  print("Hello from example-app!")
 
 
 if __name__ == "__main__":
-    main()
+  main()
 ```
 
 Python files can be executed with `uv run`:
 
 ```console
 $ cd example-app
-$ uv run main.py
+$ uv run example-app
 Hello from example-project!
 ```
 
-## Packaged applications
+!!! tip
 
-Many use-cases require a [package](./config.md#project-packaging). For example, if you are creating
-a command-line interface that will be published to PyPI or if you want to define tests in a
-dedicated directory.
+    The `--build-backend` option can be used to request an alternative build system.
 
-The `--package` flag can be used to create a packaged application:
+## Applications
+
+Application projects are suitable for web servers, scripts, and command-line interfaces. It can be
+simpler than the packaged layout.
+
+The application layout can be specified with the `--app` flag:
 
 ```console
-$ uv init --package example-pkg
+$ uv init --app example-pkg
 ```
 
-The source code is moved into a `src` directory with a module directory and an `__init__.py` file:
+There is no `src` directory, but `uv init ` create a sample `main.py` file.
 
 ```console
 $ tree example-pkg
-example-pkg
+example-app
 ├── .python-version
 ├── README.md
-├── pyproject.toml
-└── src
-    └── example_pkg
-        └── __init__.py
+├── main.py
+└── pyproject.toml
 ```
 
 A [build system](./config.md#build-systems) is defined, so the project will be installed into the
@@ -116,10 +126,6 @@ example-pkg = "example_pkg:main"
 requires = ["uv_build>=0.11.1,<0.12"]
 build-backend = "uv_build"
 ```
-
-!!! tip
-
-    The `--build-backend` option can be used to request an alternative build system.
 
 A [command](./config.md#entry-points) definition is included:
 
@@ -211,7 +217,7 @@ The created module defines a simple API function:
 
 ```python title="__init__.py"
 def hello() -> str:
-    return "Hello from example-lib!"
+  return "Hello from example-lib!"
 ```
 
 And you can import and execute it using `uv run`:
@@ -273,12 +279,12 @@ use pyo3::prelude::*;
 
 #[pymodule]
 mod _core {
-    use pyo3::prelude::*;
+  use pyo3::prelude::*;
 
-    #[pyfunction]
-    fn hello_from_bin() -> String {
-        "Hello from example-ext!".to_string()
-    }
+  #[pyfunction]
+  fn hello_from_bin() -> String {
+    "Hello from example-ext!".to_string()
+  }
 }
 ```
 
@@ -289,7 +295,7 @@ from example_ext._core import hello_from_bin
 
 
 def main() -> None:
-    print(hello_from_bin())
+  print(hello_from_bin())
 ```
 
 The command can be executed with `uv run`:
