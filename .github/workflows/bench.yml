@@ -84,6 +84,9 @@ jobs:
       - name: "Extract artifact archive"
         run: tar -xvf benchmarks-walltime.tar
 
+      - name: "Clone airflow workspace"
+        run: git clone --revision 7fa400745ac7aebc7cc4ec21d3a047e9fb258310 --depth 1 https://github.com/apache/airflow.git airflow
+
       - name: "Create venv"
         run: ./target/debug/uv venv --cache-dir .cache
 
@@ -124,6 +127,9 @@ jobs:
           cargo run --bin uv -- venv --cache-dir .cache
           cargo run --bin uv -- pip compile test/requirements/jupyter.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
           cargo run --bin uv -- pip compile test/requirements/airflow.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
+
+      - name: "Clone airflow workspace"
+        run: git clone --revision 7fa400745ac7aebc7cc4ec21d3a047e9fb258310 --depth 1 https://github.com/apache/airflow.git airflow
 
       - name: "Build benchmarks"
         run: cargo codspeed build --profile profiling -p uv-bench

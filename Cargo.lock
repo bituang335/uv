@@ -5994,10 +5994,16 @@ name = "uv-bench"
 version = "0.0.34"
 dependencies = [
  "anyhow",
+ "clap",
  "codspeed-criterion-compat",
+ "fs-err",
  "jiff",
+ "reqwest",
  "tokio",
+ "toml",
+ "uv",
  "uv-cache",
+ "uv-cli",
  "uv-client",
  "uv-configuration",
  "uv-dispatch",
