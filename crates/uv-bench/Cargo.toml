@@ -27,6 +27,7 @@ uv = { path = "../uv", default-features = false }
 uv-cache = { workspace = true }
 uv-cli = { workspace = true }
 uv-client = { workspace = true }
+uv-flags = { workspace = true }
 uv-configuration = { workspace = true }
 uv-dispatch = { workspace = true }
 uv-distribution = { workspace = true }

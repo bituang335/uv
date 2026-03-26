@@ -70,7 +70,10 @@ fn run_noop_airflow(c: &mut Criterion<WallTime>) {
     let airflow_dir = airflow_dir.to_string_lossy().to_string();
     let cache_dir = cache_dir.to_string_lossy().to_string();
 
-    // Verify the setup works before benchmarking.
+    // Verify the setup works before benchmarking. Global state may already be initialized by
+    // the resolver benchmarks running in the same process (e.g., `uv_flags::contains()` calls
+    // `OnceLock::get_or_init`).
+    let initialize_globals = !uv_flags::is_initialized();
     let cli = Cli::try_parse_from([
         "uv",
         "run",
@@ -83,7 +86,7 @@ fn run_noop_airflow(c: &mut Criterion<WallTime>) {
         "-V",
     ])
     .unwrap();
-    runtime.block_on(uv::run(cli, true)).unwrap();
+    runtime.block_on(uv::run(cli, initialize_globals)).unwrap();
 
     c.bench_function("run_noop_airflow", |b| {
         b.iter(|| {
