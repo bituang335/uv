@@ -85,7 +85,11 @@ jobs:
         run: tar -xvf benchmarks-walltime.tar
 
       - name: "Clone airflow workspace"
-        run: git clone --revision 7fa400745ac7aebc7cc4ec21d3a047e9fb258310 --depth 1 https://github.com/apache/airflow.git airflow
+        run: |
+          git init airflow
+          git -C airflow remote add origin https://github.com/apache/airflow.git
+          git -C airflow fetch --depth 1 origin 7fa400745ac7aebc7cc4ec21d3a047e9fb258310
+          git -C airflow checkout FETCH_HEAD
 
       - name: "Create venv"
         run: ./target/debug/uv venv --cache-dir .cache
@@ -129,7 +133,11 @@ jobs:
           cargo run --bin uv -- pip compile test/requirements/airflow.in --universal --exclude-newer 2024-08-08 --cache-dir .cache
 
       - name: "Clone airflow workspace"
-        run: git clone --revision 7fa400745ac7aebc7cc4ec21d3a047e9fb258310 --depth 1 https://github.com/apache/airflow.git airflow
+        run: |
+          git init airflow
+          git -C airflow remote add origin https://github.com/apache/airflow.git
+          git -C airflow fetch --depth 1 origin 7fa400745ac7aebc7cc4ec21d3a047e9fb258310
+          git -C airflow checkout FETCH_HEAD
 
       - name: "Build benchmarks"
         run: cargo codspeed build --profile profiling -p uv-bench

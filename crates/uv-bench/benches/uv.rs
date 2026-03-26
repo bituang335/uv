@@ -54,9 +54,15 @@ fn resolve_warm_airflow(c: &mut Criterion<WallTime>) {
 fn run_noop_airflow(c: &mut Criterion<WallTime>) {
     let airflow_dir = std::path::absolute("../../airflow").unwrap();
     if !airflow_dir.join("uv.lock").exists() {
+        let commit = "7fa400745ac7aebc7cc4ec21d3a047e9fb258310";
+        let repo = "https://github.com/apache/airflow.git";
         eprintln!(
-            "Airflow checkout does not exist, not running benchmark: \
-            `git clone --revision 7fa400745ac7aebc7cc4ec21d3a047e9fb258310 --depth 1 https://github.com/apache/airflow.git ../airflow`"
+            "Airflow checkout does not exist, not running benchmark.\n\
+            To set up:\n\
+            git init ../airflow\n\
+            git -C ../airflow remote add origin {repo}\n\
+            git -C ../airflow fetch --depth 1 origin {commit}\n\
+            git -C ../airflow checkout FETCH_HEAD"
         );
         return;
     }
